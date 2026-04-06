@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import SearchBar from "../components/SearchBar.jsx";
-import AnimeCard from "../components/AnimeCard.jsx";
+import SearchBar from "../components/searchBar.jsx";
+import AnimeCard from "../components/animeCard.jsx";
 import Loader from "../components/Loader.jsx";
 import { useSearch, useTrending, useSeasonal } from "../hooks/useSearch.js";
 
