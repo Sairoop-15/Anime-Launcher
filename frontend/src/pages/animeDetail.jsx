@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import VideoPlayer from "../components/VideoPlayer.jsx";
+import VideoPlayer from "../components/videoPlayer.jsx";
 import EpisodeGrid from "../components/EpisodeGrid.jsx";
 import Loader from "../components/Loader.jsx";
 
