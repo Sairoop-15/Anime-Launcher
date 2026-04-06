@@ -6,9 +6,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy all /api calls to backend — no CORS issues in dev
+      // Proxy all /api calls to deployed backend on Render
       "/api": {
-        target: "http://localhost:5000",
+        target: "https://anime-launcher-4.onrender.com",
         changeOrigin: true,
         secure: false,
       },
