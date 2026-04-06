@@ -1,0 +1,118 @@
+### ============================================================================
+### ANIME ROUTES (AniList Integration)
+### ============================================================================
+
+@baseUrl = http://localhost:5000/api/anime
+
+### Get Trending Anime
+GET {{baseUrl}}/trending?page=1&perPage=10
+
+### Get Seasonal Anime (Winter 2024)
+GET {{baseUrl}}/seasonal?season=WINTER&year=2024&page=1
+
+### Search for Anime
+GET {{baseUrl}}/search?q=Frieren
+
+### Get Detailed Info by ID
+GET {{baseUrl}}/info/154587
+
+### Get Episode List for an ID
+GET {{baseUrl}}/episodes/154587
+
+### Search Torrents for a Specific Episode
+# Finds magnets from Nyaa/Prowlarr without starting a download
+GET {{baseUrl}}/episode-torrents?title=Frieren&episode=1&quality=1080p&sources=nyaa,prowlarr
+
+### Search Batch/Complete Series Torrents
+GET {{baseUrl}}/batch-torrents?title=Cyberpunk+Edgerunners
+
+---
+
+### ============================================================================
+### TORRENT ROUTES (Search & WebTorrent Management)
+### ============================================================================
+
+@torrentUrl = http://localhost:5000/api/torrent
+
+### Search Nyaa directly
+GET {{torrentUrl}}/nyaa?q=Sousou+no+Frieren+01
+
+### Parallel Search (Nyaa + Prowlarr)
+GET {{torrentUrl}}/search?q=One+Piece+1000
+
+### Start a Download
+# Replace the magnet link with a real one for testing
+POST {{torrentUrl}}/download
+Content-Type: application/json
+
+{
+  "magnet": "magnet:?xt=urn:btih:EXAMPLE_HASH_HERE&dn=Anime_Episode"
+}
+
+### List All Active Downloads
+GET {{torrentUrl}}/downloads
+
+### Get Stats for a Specific Download
+# Replace :infoHash with a real hash from the /downloads list
+@activeHash = EXAMPLE_HASH_HERE
+GET {{torrentUrl}}/downloads/{{activeHash}}
+
+### Delete a Download (and files)
+DELETE {{torrentUrl}}/downloads/{{activeHash}}?deleteFiles=true
+
+---
+
+### ============================================================================
+### PLAYER ROUTES (MPV Automation)
+### ============================================================================
+
+@playerUrl = http://localhost:5000/api/player
+
+### Check MPV Installation Status
+GET {{playerUrl}}/check
+
+### Play a Direct Stream URL (HLS/Direct MP4)
+POST {{playerUrl}}/play/stream
+Content-Type: application/json
+
+{
+  "url": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  "title": "Big Buck Bunny Test",
+  "volume": 80,
+  "fullscreen": false
+}
+
+### FULL PIPELINE: Search -> Add Torrent -> Buffer -> Launch MPV
+# This triggers the automated workflow in your /play/episode route
+POST {{playerUrl}}/play/episode
+Content-Type: application/json
+
+{
+  "animeTitle": "Boku no Kokoro no Yabai Yatsu",
+  "episodeNumber": 1,
+  "quality": "1080p",
+  "sources": "nyaa"
+}
+
+### List Active MPV Sessions
+GET {{playerUrl}}/sessions
+
+### Get Status of a Session
+# Replace :sessionId with the ID returned from the play commands
+@sessionId = SESSION_ID_HERE
+GET {{playerUrl}}/sessions/{{sessionId}}
+
+### Stop/Kill a Specific Session
+DELETE {{playerUrl}}/sessions/{{sessionId}}
+
+### Kill ALL Active MPV Processes
+DELETE {{playerUrl}}/sessions
+
+### Play a Local File (Careful with paths)
+POST {{playerUrl}}/play/local
+Content-Type: application/json
+
+{
+  "filePath": "C:/Downloads/Anime/Episode01.mkv",
+  "title": "Local Playback Test"
+}
