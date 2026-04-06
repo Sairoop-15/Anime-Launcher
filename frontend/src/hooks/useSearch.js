@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
+import api, { axios } from "../api.js";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const DEBOUNCE_MS    = 400;
@@ -35,7 +35,7 @@ export function useSearch() {
     setError(null);
 
     try {
-      const res = await axios.get("/api/anime/search", {
+      const res = await api.get("/api/anime/search", {
         params: { q: q.trim(), page: pg },
         signal: cancelRef.current.signal,
       });
@@ -130,7 +130,7 @@ export function useTrending(page = 1) {
       setLoading(true);
       setError(null);
       try {
-        const res = await axios.get("/api/anime/trending", {
+        const res = await api.get("/api/anime/trending", {
           params: { page, perPage: 20 },
         });
         if (!cancelled) setData(res.data.results || []);
@@ -166,7 +166,7 @@ export function useSeasonal(season, year) {
       setLoading(true);
       setError(null);
       try {
-        const res = await axios.get("/api/anime/seasonal", {
+        const res = await api.get("/api/anime/seasonal", {
           params: { season, year },
         });
         if (!cancelled) setData(res.data.results || []);

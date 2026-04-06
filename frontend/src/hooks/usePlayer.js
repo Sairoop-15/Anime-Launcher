@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
+import api from "../api.js";
 
 // ── Status constants ──────────────────────────────────────────────────────────
 export const PLAYER_STATUS = {
@@ -41,7 +41,7 @@ export function usePlayer() {
   // ── Check MPV installation ─────────────────────────────────────────────────
   const checkMPV = useCallback(async () => {
     try {
-      const res = await axios.get("/api/player/check");
+      const res = await api.get("/api/player/check");
       setMpvInstalled(res.data.installed);
       return res.data;
     } catch (err) {
@@ -64,7 +64,7 @@ export function usePlayer() {
     });
 
     try {
-      const res = await axios.post("/api/player/play/stream", {
+      const res = await api.post("/api/player/play/stream", {
         url,
         title:      options.title      || "Anime Launcher",
         subFile:    options.subFile    || null,
@@ -100,7 +100,7 @@ const playEpisode = useCallback(async (episodeId, options = {}) => {
   });
 
   try {
-    const res = await axios.post("/api/player/play/episode", {
+    const res = await api.post("/api/player/play/episode", {
       animeTitle:    options.animeTitle,
       episodeNumber: options.episodeNumber,
       quality:       options.quality    || "1080p",
@@ -139,14 +139,14 @@ const playEpisode = useCallback(async (episodeId, options = {}) => {
 
     try {
       // Step 1 — Add torrent, get infoHash
-      const addRes = await axios.post("/api/torrent/add", { magnet });
+      const addRes = await api.post("/api/torrent/add", { magnet });
       const { infoHash, streamUrl, fileName } = addRes.data;
 
       // Step 2 — Poll torrent stats while buffering
       await pollTorrentBuffer(infoHash, options.minBuffer ?? 0.5);
 
       // Step 3 — Launch MPV with the local stream URL
-      const playRes = await axios.post("/api/player/play/stream", {
+      const playRes = await api.post("/api/player/play/stream", {
         url:        streamUrl,
         title:      options.title      || fileName || "Anime Launcher",
         quality:    options.quality    || null,
@@ -178,7 +178,7 @@ const playEpisode = useCallback(async (episodeId, options = {}) => {
     if (!session?.sessionId) return;
 
     try {
-      await axios.delete(`/api/player/sessions/${session.sessionId}`);
+      await api.delete(`/api/player/sessions/${session.sessionId}`);
     } catch (_) {
       // Session may already be gone — ignore
     } finally {
@@ -195,7 +195,7 @@ const playEpisode = useCallback(async (episodeId, options = {}) => {
   // ── Kill ALL MPV sessions ─────────────────────────────────────────────────
   const stopAll = useCallback(async () => {
     try {
-      await axios.delete("/api/player/sessions");
+      await api.delete("/api/player/sessions");
     } catch (_) {}
     finally {
       stopSessionPoll();
@@ -213,7 +213,7 @@ const playEpisode = useCallback(async (episodeId, options = {}) => {
     stopSessionPoll();
     sessionPollRef.current = setInterval(async () => {
       try {
-        const res = await axios.get(`/api/player/sessions/${sessionId}`);
+        const res = await api.get(`/api/player/sessions/${sessionId}`);
         const s = res.data;
         setSession(s);
 
@@ -247,7 +247,7 @@ const playEpisode = useCallback(async (episodeId, options = {}) => {
     stopTorrentPoll();
     torrentPollRef.current = setInterval(async () => {
       try {
-        const res = await axios.get(`/api/torrent/stats/${infoHash}`);
+        const res = await api.get(`/api/torrent/stats/${infoHash}`);
         setTorrentStats(res.data);
       } catch (_) {
         stopTorrentPoll();
@@ -268,7 +268,7 @@ const playEpisode = useCallback(async (episodeId, options = {}) => {
       const deadline = Date.now() + 90_000; // 90s max wait
       const iv = setInterval(async () => {
         try {
-          const res = await axios.get(`/api/torrent/stats/${infoHash}`);
+          const res = await api.get(`/api/torrent/stats/${infoHash}`);
           const stats = res.data;
           setTorrentStats(stats);
 

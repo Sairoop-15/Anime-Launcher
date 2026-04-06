@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api.js";
 import VideoPlayer from "../components/videoPlayer.jsx";
 import EpisodeGrid from "../components/EpisodeGrid.jsx";
 import Loader from "../components/Loader.jsx";
@@ -50,7 +50,7 @@ export default function AnimeDetail() {
   async function fetchMeta() {
     setLoadingMeta(true);
     try {
-      const res = await axios.get(`/api/anime/info/${id}`);
+      const res = await api.get(`/api/anime/info/${id}`);
       setAnilistData(res.data);
     } catch {
       setError("Failed to load anime info");
@@ -62,7 +62,7 @@ export default function AnimeDetail() {
   async function fetchEpisodes() {
     setLoadingEps(true);
     try {
-      const res = await axios.get(`/api/anime/episodes/${id}`);
+      const res = await api.get(`/api/anime/episodes/${id}`);
       setEpisodes(res.data.episodes || []);
 
       // Auto-select first episode if none selected
@@ -78,7 +78,7 @@ export default function AnimeDetail() {
 
   async function checkSources() {
     try {
-      const res = await axios.get("/api/anime/sources-status");
+      const res = await api.get("/api/anime/sources-status");
       setSourcesOk(res.data.megaplay?.available ?? true);
     } catch {
       setSourcesOk(true); // assume ok
