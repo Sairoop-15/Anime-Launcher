@@ -1,129 +1,89 @@
-// backend/services/webtorrent.js
-// Downloads torrents to disk — no streaming, no MPV
+// ── MegaPlay API wrapper ───────────────────────────────────────────────────────
+// Docs: https://megaplay.buzz/
+// Streams anime via AniList ID + episode number as an iframe embed
 
-const WebTorrent = require('webtorrent');
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
+const axios = require("axios");
 
-// ── Download directory ────────────────────────────────────────────────────────
-const DOWNLOAD_DIR =
-  process.env.DOWNLOAD_DIR || path.join(os.homedir(), 'Downloads', 'Anime');
+const MEGAPLAY_BASE = "https://megaplay.buzz";
 
-if (!fs.existsSync(DOWNLOAD_DIR)) {
-  fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+// ── Language options ──────────────────────────────────────────────────────────
+const LANG = {
+  SUB: "sub",
+  DUB: "dub",
+};
+
+// ── Build embed URL from AniList ID + episode number ─────────────────────────
+// This is the primary endpoint we use since we already have AniList data
+function getAnilistEmbedUrl(anilistId, episodeNumber, language = LANG.SUB) {
+  if (!anilistId || !episodeNumber) {
+    throw new Error("anilistId and episodeNumber are required");
+  }
+  const lang = language === "dub" ? LANG.DUB : LANG.SUB;
+  return `${MEGAPLAY_BASE}/stream/ani/${anilistId}/${episodeNumber}/${lang}`;
 }
 
-// ── Singleton WebTorrent client ───────────────────────────────────────────────
-const client = new WebTorrent();
+// ── Build embed URL from MAL ID + episode number ──────────────────────────────
+function getMalEmbedUrl(malId, episodeNumber, language = LANG.SUB) {
+  if (!malId || !episodeNumber) {
+    throw new Error("malId and episodeNumber are required");
+  }
+  const lang = language === "dub" ? LANG.DUB : LANG.SUB;
+  return `${MEGAPLAY_BASE}/stream/mal/${malId}/${episodeNumber}/${lang}`;
+}
 
-client.on('error', (err) => console.error('[WebTorrent] client error:', err));
+// ── Build embed URL from Aniwatch episode ID ──────────────────────────────────
+function getAniwatchEmbedUrl(aniwatchEpId, language = LANG.SUB) {
+  if (!aniwatchEpId) throw new Error("aniwatchEpId is required");
+  const lang = language === "dub" ? LANG.DUB : LANG.SUB;
+  return `${MEGAPLAY_BASE}/stream/s-2/${aniwatchEpId}/${lang}`;
+}
 
-// ── Internal state ────────────────────────────────────────────────────────────
-// Keeps metadata after a torrent is removed from the client (finished downloads)
-const finishedDownloads = new Map(); // infoHash → snapshot
+// ── Build iframe HTML string ──────────────────────────────────────────────────
+function buildIframeHtml(embedUrl) {
+  return `<iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" scrolling="no" allowfullscreen></iframe>`;
+}
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function formatTorrent(torrent) {
+// ── Get all embed variants for an episode ─────────────────────────────────────
+// Returns both sub and dub URLs so frontend can toggle instantly
+function getEpisodeEmbeds(anilistId, episodeNumber) {
   return {
-    infoHash: torrent.infoHash,
-    name: torrent.name || torrent.infoHash,
-    progress: parseFloat((torrent.progress * 100).toFixed(1)),   // 0–100
-    downloaded: torrent.downloaded,
-    total: torrent.length || 0,
-    downloadSpeed: torrent.downloadSpeed,
-    uploadSpeed: torrent.uploadSpeed,
-    numPeers: torrent.numPeers,
-    done: torrent.done,
-    savePath: DOWNLOAD_DIR,
-    files: (torrent.files || []).map((f) => ({
-      name: f.name,
-      length: f.length,
-      downloaded: f.downloaded,
-      progress: parseFloat((f.progress * 100).toFixed(1)),
-    })),
+    sub: getAnilistEmbedUrl(anilistId, episodeNumber, LANG.SUB),
+    dub: getAnilistEmbedUrl(anilistId, episodeNumber, LANG.DUB),
+    anilistId:     parseInt(anilistId),
+    episodeNumber: parseInt(episodeNumber),
   };
 }
 
-// ── Public API ─────────────────────────────────────────────────────────────────
-
-/**
- * Add a magnet/torrent and start downloading to DOWNLOAD_DIR.
- * Resolves immediately with initial stats; poll /downloads/:infoHash for progress.
- */
-function addDownload(magnet) {
-  return new Promise((resolve, reject) => {
-    // Already active?
-    const existing = client.get(magnet);
-    if (existing) {
-      return resolve(formatTorrent(existing));
+// ── Verify embed is accessible (HEAD request) ────────────────────────────────
+// Note: MegaPlay disables direct access, so this checks reachability only
+async function checkAvailability() {
+  try {
+    await axios.head(MEGAPLAY_BASE, { timeout: 5000 });
+    return { available: true, url: MEGAPLAY_BASE };
+  } catch (err) {
+    // MegaPlay may block HEAD — still likely available
+    if (err.response?.status === 403 || err.response?.status === 405) {
+      return { available: true, url: MEGAPLAY_BASE, note: "HEAD blocked but likely up" };
     }
-
-    client.add(magnet, { path: DOWNLOAD_DIR }, (torrent) => {
-      console.log(`[WebTorrent] started: ${torrent.name}`);
-
-      torrent.on('error', (err) => {
-        console.error(`[WebTorrent] torrent error (${torrent.name}):`, err.message);
-      });
-
-      torrent.on('done', () => {
-        console.log(`[WebTorrent] finished: ${torrent.name}`);
-        // Snapshot finished state so it still shows up in getAllDownloads()
-        finishedDownloads.set(torrent.infoHash, {
-          ...formatTorrent(torrent),
-          done: true,
-          progress: 100,
-        });
-      });
-
-      resolve(formatTorrent(torrent));
-    });
-
-    // Surface add errors
-    client.once('error', (err) => reject(err));
-  });
+    return { available: false, url: MEGAPLAY_BASE, reason: err.message };
+  }
 }
 
-/**
- * Live stats for one torrent. Returns null if unknown.
- */
-function getDownloadStats(infoHash) {
-  const active = client.get(infoHash);
-  if (active) return formatTorrent(active);
-  if (finishedDownloads.has(infoHash)) return finishedDownloads.get(infoHash);
-  return null;
-}
-
-/**
- * All active + finished downloads.
- */
-function getAllDownloads() {
-  const active = client.torrents.map(formatTorrent);
-  const finished = [...finishedDownloads.values()].filter(
-    (f) => !active.find((a) => a.infoHash === f.infoHash)
-  );
-  return [...active, ...finished];
-}
-
-/**
- * Remove / cancel a download.  destroyStore=false keeps files already on disk.
- */
-function removeDownload(infoHash, deleteFiles = false) {
-  return new Promise((resolve) => {
-    const torrent = client.get(infoHash);
-    finishedDownloads.delete(infoHash);
-    if (!torrent) return resolve({ removed: false, reason: 'not found' });
-
-    torrent.destroy({ destroyStore: deleteFiles }, () => {
-      resolve({ removed: true, deleteFiles });
-    });
-  });
-}
+// ── postMessage event types sent by MegaPlay player ──────────────────────────
+// Frontend can listen for these to implement auto-next, progress tracking etc.
+const PLAYER_EVENTS = {
+  TIME:     "time",       // { event:"time", time, duration, percent }
+  COMPLETE: "complete",   // episode finished
+  LOG:      "watching-log", // { type:"watching-log", currentTime, duration }
+};
 
 module.exports = {
-  addDownload,
-  getDownloadStats,
-  getAllDownloads,
-  removeDownload,
-  DOWNLOAD_DIR,
+  getAnilistEmbedUrl,
+  getMalEmbedUrl,
+  getAniwatchEmbedUrl,
+  getEpisodeEmbeds,
+  buildIframeHtml,
+  checkAvailability,
+  PLAYER_EVENTS,
+  LANG,
 };
