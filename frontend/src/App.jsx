@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home.jsx";
-import AnimeDetail from "./pages/AnimeDetail.jsx";
+import AnimeDetail from "./pages/animeDetail.jsx";
 
 // ── Global styles ─────────────────────────────────────────────────────────────
 const styles = `
